@@ -1,4 +1,4 @@
-"""Acesso às sessões de conversa armazenadas no MongoDB."""
+"""Acesso aos dados de conversa armazenados no MongoDB."""
 
 from __future__ import annotations
 
@@ -12,12 +12,24 @@ class MongoSessionDataError(ValueError):
     """Indica um documento de sessão incompatível com o contrato esperado."""
 
 
+class MongoMessageDataError(ValueError):
+    """Indica um documento de mensagem incompatível com o contrato esperado."""
+
+
 @dataclass(frozen=True, slots=True)
 class ChatSession:
     """Identificação e data necessárias para expurgar uma sessão."""
 
     session_id: str
     started_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ConversationMessage:
+    """Identifica uma mensagem e a data usada para sua retenção."""
+
+    message_id: str
+    sent_at: datetime
 
 
 class ChatSessionRepository(Protocol):
@@ -28,6 +40,18 @@ class ChatSessionRepository(Protocol):
     def is_expired(self, session_id: str, cutoff: datetime) -> bool: ...
 
     def delete_expired(self, session: ChatSession, cutoff: datetime) -> bool: ...
+
+    def close(self) -> None: ...
+
+
+class ConversationRepository(Protocol):
+    """Contrato das operações de mensagens usadas pelo worker."""
+
+    def list_expired(self, cutoff: datetime) -> Iterable[ConversationMessage]: ...
+
+    def is_expired(self, message_id: str, cutoff: datetime) -> bool: ...
+
+    def delete_expired(self, message: ConversationMessage, cutoff: datetime) -> bool: ...
 
     def close(self) -> None: ...
 
@@ -131,3 +155,80 @@ class MongoChatSessionRepository:
             started_at = started_at.replace(tzinfo=timezone.utc)
 
         return ChatSession(session_id=session_id, started_at=started_at)
+
+
+class MongoConversationRepository:
+    """Consulta e remove documentos expirados da coleção ``mensagens``."""
+
+    def __init__(
+        self,
+        mongodb_uri: str,
+        database_name: str,
+        collection_name: str = "mensagens",
+        *,
+        client: MongoClientProtocol | None = None,
+        collection: MongoCollectionProtocol | None = None,
+    ) -> None:
+        if client is None or collection is None:
+            try:
+                from pymongo import MongoClient
+            except ImportError as error:
+                raise RuntimeError(
+                    "Dependência pymongo não instalada. Execute a instalação do projeto."
+                ) from error
+
+            mongo_client = MongoClient(mongodb_uri, tz_aware=True)
+            client = mongo_client
+            collection = mongo_client[database_name][collection_name]
+
+        self._client = client
+        self._collection = collection
+
+    def list_expired(self, cutoff: datetime) -> Iterable[ConversationMessage]:
+        """Lista mensagens enviadas antes da data limite."""
+        query = self._expiration_filter(cutoff)
+        projection = {"_id": 1, "data": 1}
+        for document in self._collection.find(query, projection):
+            yield self._to_message(document)
+
+    def is_expired(self, message_id: str, cutoff: datetime) -> bool:
+        """Revalida a mensagem imediatamente antes do expurgo."""
+        query = {"_id": message_id, **self._expiration_filter(cutoff)}
+        return self._collection.find_one(query, {"_id": 1}) is not None
+
+    def delete_expired(self, message: ConversationMessage, cutoff: datetime) -> bool:
+        """Remove a mensagem somente se sua data original continuar elegível."""
+        query = {
+            "_id": message.message_id,
+            "data": {
+                "$eq": message.sent_at,
+                "$type": "date",
+                "$lt": cutoff,
+            },
+        }
+        result = self._collection.delete_one(query)
+        return int(getattr(result, "deleted_count", 0)) == 1
+
+    def close(self) -> None:
+        """Encerra o cliente MongoDB."""
+        self._client.close()
+
+    @staticmethod
+    def _expiration_filter(cutoff: datetime) -> dict[str, object]:
+        return {"data": {"$type": "date", "$lt": cutoff}}
+
+    @staticmethod
+    def _to_message(document: Mapping[str, object]) -> ConversationMessage:
+        message_id = document.get("_id")
+        sent_at = document.get("data")
+
+        if not isinstance(message_id, str) or not message_id:
+            raise MongoMessageDataError("A mensagem deve possuir um _id textual não vazio.")
+        if not isinstance(sent_at, datetime):
+            raise MongoMessageDataError(
+                f"A mensagem {message_id} deve possuir data como BSON Date."
+            )
+        if sent_at.tzinfo is None:
+            sent_at = sent_at.replace(tzinfo=timezone.utc)
+
+        return ConversationMessage(message_id=message_id, sent_at=sent_at)

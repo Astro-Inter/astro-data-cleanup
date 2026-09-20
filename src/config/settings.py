@@ -40,6 +40,7 @@ class Settings:
     mongodb_uri: str | None = None
     mongodb_database: str | None = None
     mongodb_sessions_collection: str = "sessoes"
+    mongodb_messages_collection: str = "mensagens"
     qdrant_url: str | None = None
     qdrant_api_key: str | None = None
     qdrant_summaries_collection: str = "memoria_resumos"
@@ -60,6 +61,9 @@ class Settings:
         mongodb_database = source.get("MONGODB_DATABASE", "").strip() or None
         mongodb_sessions_collection = (
             source.get("MONGODB_SESSIONS_COLLECTION", "sessoes").strip() or "sessoes"
+        )
+        mongodb_messages_collection = (
+            source.get("MONGODB_MESSAGES_COLLECTION", "mensagens").strip() or "mensagens"
         )
         qdrant_url = source.get("QDRANT_URL", "").strip() or None
         qdrant_api_key = source.get("QDRANT_API_KEY", "").strip() or None
@@ -82,6 +86,7 @@ class Settings:
             mongodb_uri=mongodb_uri,
             mongodb_database=mongodb_database,
             mongodb_sessions_collection=mongodb_sessions_collection,
+            mongodb_messages_collection=mongodb_messages_collection,
             qdrant_url=qdrant_url,
             qdrant_api_key=qdrant_api_key,
             qdrant_summaries_collection=qdrant_summaries_collection,

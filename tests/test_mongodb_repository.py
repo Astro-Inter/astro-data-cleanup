@@ -5,7 +5,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.database.mongodb import MongoChatSessionRepository, MongoSessionDataError
+from src.database.mongodb import (
+    MongoChatSessionRepository,
+    MongoConversationRepository,
+    MongoMessageDataError,
+    MongoSessionDataError,
+)
 
 
 class FakeMongoClient:
@@ -80,3 +85,53 @@ def test_repository_rejects_non_textual_session_id() -> None:
 
     with pytest.raises(MongoSessionDataError, match="_id textual"):
         list(repository.list_expired(datetime(2025, 1, 10, tzinfo=timezone.utc)))
+
+
+def test_conversation_repository_lists_revalidates_and_deletes_expired_message() -> None:
+    sent_at = datetime(2023, 9, 19, tzinfo=timezone.utc)
+    cutoff = datetime(2024, 9, 19, tzinfo=timezone.utc)
+    client = FakeMongoClient()
+    collection = FakeCollection({"_id": "message-1", "data": sent_at})
+    repository = MongoConversationRepository(
+        "unused",
+        "unused",
+        client=client,
+        collection=collection,
+    )
+
+    messages = list(repository.list_expired(cutoff))
+
+    assert messages[0].message_id == "message-1"
+    assert messages[0].sent_at == sent_at
+    assert repository.is_expired("message-1", cutoff) is True
+    assert repository.delete_expired(messages[0], cutoff) is True
+    assert collection.find_calls[0][0] == {"data": {"$type": "date", "$lt": cutoff}}
+    assert collection.delete_calls[0] == {
+        "_id": "message-1",
+        "data": {"$eq": sent_at, "$type": "date", "$lt": cutoff},
+    }
+
+    repository.close()
+    assert client.closed is True
+
+
+@pytest.mark.parametrize(
+    ("document", "error_message"),
+    [
+        ({"_id": 123, "data": datetime(2023, 9, 19, tzinfo=timezone.utc)}, "_id textual"),
+        ({"_id": "message-1", "data": "2023-09-19"}, "BSON Date"),
+    ],
+)
+def test_conversation_repository_rejects_invalid_message(
+    document: dict[str, object],
+    error_message: str,
+) -> None:
+    repository = MongoConversationRepository(
+        "unused",
+        "unused",
+        client=FakeMongoClient(),
+        collection=FakeCollection(document),
+    )
+
+    with pytest.raises(MongoMessageDataError, match=error_message):
+        list(repository.list_expired(datetime(2024, 9, 19, tzinfo=timezone.utc)))

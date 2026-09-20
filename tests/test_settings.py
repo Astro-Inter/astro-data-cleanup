@@ -10,6 +10,7 @@ def test_settings_use_safe_defaults() -> None:
     assert settings.dry_run is True
     assert settings.log_level == "INFO"
     assert settings.mongodb_sessions_collection == "sessoes"
+    assert settings.mongodb_messages_collection == "mensagens"
     assert settings.qdrant_summaries_collection == "memoria_resumos"
 
 
@@ -53,6 +54,7 @@ def test_settings_load_chatbot_storage_configuration() -> None:
             "MONGODB_URI": "mongodb://example",
             "MONGODB_DATABASE": "chatbot",
             "MONGODB_SESSIONS_COLLECTION": "custom_sessions",
+            "MONGODB_MESSAGES_COLLECTION": "custom_messages",
             "QDRANT_URL": "https://qdrant.example:6333",
             "QDRANT_API_KEY": "secret",
             "QDRANT_SUMMARIES_COLLECTION": "custom_summaries",
@@ -62,6 +64,7 @@ def test_settings_load_chatbot_storage_configuration() -> None:
     assert settings.mongodb_uri == "mongodb://example"
     assert settings.mongodb_database == "chatbot"
     assert settings.mongodb_sessions_collection == "custom_sessions"
+    assert settings.mongodb_messages_collection == "custom_messages"
     assert settings.qdrant_url == "https://qdrant.example:6333"
     assert settings.qdrant_api_key == "secret"
     assert settings.qdrant_summaries_collection == "custom_summaries"

@@ -10,6 +10,7 @@ from src.config.settings import Settings
 from src.database.mongodb import ChatSession, ChatSessionRepository, MongoChatSessionRepository
 from src.database.qdrant import QdrantSessionVectorRepository, SessionVectorRepository
 from src.workers.base import BaseWorker
+from src.workers.retention import calendar_years_before
 
 
 class ChatbotSessionCleanupError(RuntimeError):
@@ -28,14 +29,7 @@ class CleanupSummary:
 
 def one_calendar_year_before(moment: datetime) -> datetime:
     """Calcula a retenção anual preservando horário e fuso UTC."""
-    if moment.tzinfo is None:
-        raise ValueError("O relógio do worker deve fornecer uma data com fuso horário.")
-
-    normalized = moment.astimezone(timezone.utc)
-    try:
-        return normalized.replace(year=normalized.year - 1)
-    except ValueError:
-        return normalized.replace(year=normalized.year - 1, day=28)
+    return calendar_years_before(moment, 1)
 
 
 class ChatbotSessionsWorker(BaseWorker):

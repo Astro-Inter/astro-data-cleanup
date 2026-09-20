@@ -7,7 +7,7 @@ ambiente e disparar cada worker.
 
 > Estado atual: fundação criada pela SCRUM-230, worker de usuários órfãos
 > implementado pela SCRUM-231 e worker de sessões antigas implementado pela
-> SCRUM-232. Os itens restantes serão adicionados nas subtarefas seguintes.
+> SCRUM-232. O expurgo de conversas antigas foi implementado pela SCRUM-233.
 
 ## Princípios da arquitetura
 
@@ -38,7 +38,7 @@ astro-data-cleanup/
 │   ├── workers/
 │   │   ├── firebase_orphan_users/ # Worker implementado na SCRUM-231
 │   │   ├── chatbot_sessions/      # Worker implementado na SCRUM-232
-│   │   ├── old_conversations/     # SCRUM-233
+│   │   ├── old_conversations/     # Worker implementado na SCRUM-233
 │   │   ├── base.py
 │   │   └── registry.py
 │   └── main.py
@@ -46,9 +46,6 @@ astro-data-cleanup/
 ├── .env.example
 └── pyproject.toml
 ```
-
-Diretórios reservados que ainda não possuem implementação contêm um
-`.gitkeep` para serem versionados.
 
 ## Requisitos
 
@@ -84,10 +81,11 @@ O worker valida que o `project_id` dentro das credenciais corresponde a
 `FIREBASE_PROJECT_ID` antes de acessar o Authentication. Essa proteção evita
 executar o expurgo acidentalmente em outro projeto Firebase.
 
-O MongoDB usa `MONGODB_URI`, `MONGODB_DATABASE` e a coleção configurável
-`MONGODB_SESSIONS_COLLECTION`, cujo padrão é `sessoes`. O `QDRANT_URL` deve ser
-a URL base da instância, sem o caminho `/dashboard`, e usa `QDRANT_API_KEY`. A
-coleção `QDRANT_SUMMARIES_COLLECTION` tem como padrão `memoria_resumos`.
+O MongoDB usa `MONGODB_URI` e `MONGODB_DATABASE`. As coleções configuráveis
+`MONGODB_SESSIONS_COLLECTION` e `MONGODB_MESSAGES_COLLECTION` têm como padrão
+`sessoes` e `mensagens`, respectivamente. O `QDRANT_URL` deve ser a URL base da
+instância, sem o caminho `/dashboard`, e usa `QDRANT_API_KEY`. A coleção
+`QDRANT_SUMMARIES_COLLECTION` tem como padrão `memoria_resumos`.
 
 ## Execução local
 
@@ -109,8 +107,8 @@ Executar todos os workers registrados:
 python -m src.main all
 ```
 
-Os workers disponíveis nesta etapa são `firebase-orphan-users` e
-`chatbot-sessions`.
+Os workers disponíveis nesta etapa são `firebase-orphan-users`,
+`chatbot-sessions` e `old-conversations`.
 
 ### DRY RUN
 
@@ -180,6 +178,24 @@ Execução inicial em modo seguro:
 
 ```bash
 DRY_RUN=true python -m src.main chatbot-sessions
+```
+
+## Worker de conversas antigas
+
+O worker `old-conversations` considera expirada cada mensagem da coleção
+`mensagens` cujo campo BSON Date `data` seja estritamente anterior a dois
+anos-calendário contados em UTC.
+
+Antes de excluir cada documento, o worker revalida seu `_id` e a data limite.
+A exclusão também exige que o campo `data` ainda seja exatamente igual ao valor
+lido inicialmente, evitando remover uma mensagem modificada durante a execução.
+Falhas individuais são registradas, as demais mensagens continuam sendo
+processadas e o worker termina com código diferente de zero.
+
+Execução inicial em modo seguro:
+
+```bash
+DRY_RUN=true python -m src.main old-conversations
 ```
 
 ## Testes
