@@ -7,7 +7,8 @@ ambiente e disparar cada worker.
 
 > Estado atual: fundação criada pela SCRUM-230, worker de usuários órfãos
 > implementado pela SCRUM-231 e worker de sessões antigas implementado pela
-> SCRUM-232. O expurgo de conversas antigas foi implementado pela SCRUM-233.
+> SCRUM-232. O expurgo de conversas antigas foi implementado pela SCRUM-233 e
+> as execuções automatizadas pela SCRUM-234.
 
 ## Princípios da arquitetura
 
@@ -24,7 +25,7 @@ ambiente e disparar cada worker.
 ```text
 astro-data-cleanup/
 ├── .github/
-│   └── workflows/                 # SCRUM-234
+│   └── workflows/                 # Automações implementadas na SCRUM-234
 ├── src/
 │   ├── config/
 │   │   ├── logging_config.py
@@ -198,6 +199,38 @@ Execução inicial em modo seguro:
 DRY_RUN=true python -m src.main old-conversations
 ```
 
+## Execução automatizada
+
+Cada worker possui um workflow dedicado no GitHub Actions. Os agendamentos
+usam UTC e são escalonados para impedir que as rotinas iniciem simultaneamente:
+
+| Workflow | Worker | Agendamento semanal |
+| --- | --- | --- |
+| `firebase-orphan-users.yml` | `firebase-orphan-users` | Domingo, 03:10 UTC |
+| `chatbot-sessions.yml` | `chatbot-sessions` | Domingo, 03:30 UTC |
+| `old-conversations.yml` | `old-conversations` | Domingo, 03:50 UTC |
+
+Execuções agendadas usam `DRY_RUN=false` para realizar o expurgo. Ao iniciar
+um workflow manualmente pela aba Actions, o campo `dry_run` começa em `true` e
+precisa ser alterado explicitamente para permitir exclusões.
+
+Configure estes GitHub Actions Secrets antes de habilitar os workflows:
+
+| Secret | Workflows que utilizam |
+| --- | --- |
+| `POSTGRES_URL` | Usuários órfãos |
+| `FIREBASE_PROJECT_ID` | Usuários órfãos |
+| `FIREBASE_CREDENTIALS_BASE64` | Usuários órfãos |
+| `MONGODB_URI` | Sessões e conversas antigas |
+| `MONGODB_DATABASE` | Sessões e conversas antigas |
+| `QDRANT_URL` | Sessões antigas |
+| `QDRANT_API_KEY` | Sessões antigas |
+
+Os workflows solicitam somente permissão de leitura do conteúdo do
+repositório, não persistem credenciais Git no checkout e bloqueiam execuções
+simultâneas do mesmo worker. Agendamentos do GitHub Actions passam a funcionar
+quando os arquivos estão na branch padrão do repositório.
+
 ## Testes
 
 Os testes não acessam infraestrutura externa. Execute:
@@ -218,7 +251,7 @@ mocks nos testes.
 4. Registre a classe com `@register_worker`.
 5. Importe o módulo em `src/workers/__init__.py` para ativar o registro.
 6. Adicione testes com clientes externos simulados.
-7. Na SCRUM-234, crie um workflow dedicado que invoque o nome registrado.
+7. Crie um workflow dedicado que invoque o nome registrado.
 
 ## Relação com as subtarefas
 
