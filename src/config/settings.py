@@ -34,6 +34,9 @@ class Settings:
     app_env: str = "development"
     dry_run: bool = True
     log_level: str = "INFO"
+    postgres_url: str | None = None
+    firebase_project_id: str | None = None
+    firebase_credentials_base64: str | None = None
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -42,9 +45,28 @@ class Settings:
         app_env = source.get("APP_ENV", "development").strip() or "development"
         dry_run = parse_bool(source.get("DRY_RUN", "true"), "DRY_RUN")
         log_level = source.get("LOG_LEVEL", "INFO").strip().upper() or "INFO"
+        postgres_url = source.get("POSTGRES_URL", "").strip() or None
+        firebase_project_id = source.get("FIREBASE_PROJECT_ID", "").strip() or None
+        firebase_credentials_base64 = (
+            source.get("FIREBASE_CREDENTIALS_BASE64", "").strip() or None
+        )
 
         if log_level not in VALID_LOG_LEVELS:
             allowed = ", ".join(sorted(VALID_LOG_LEVELS))
             raise SettingsError(f"LOG_LEVEL deve ser um de: {allowed}")
 
-        return cls(app_env=app_env, dry_run=dry_run, log_level=log_level)
+        return cls(
+            app_env=app_env,
+            dry_run=dry_run,
+            log_level=log_level,
+            postgres_url=postgres_url,
+            firebase_project_id=firebase_project_id,
+            firebase_credentials_base64=firebase_credentials_base64,
+        )
+
+    @staticmethod
+    def require(value: str | None, variable_name: str) -> str:
+        """Exige uma configuração apenas quando o worker que a usa for executado."""
+        if value is None:
+            raise SettingsError(f"Variável obrigatória não configurada: {variable_name}")
+        return value

@@ -66,6 +66,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except UnknownWorkerError as error:
         LOGGER.error("%s", error)
         return 2
+    except SettingsError as error:
+        LOGGER.error("Configuração inválida: %s", error)
+        return 2
     except Exception:
         LOGGER.exception("Execução encerrada devido a um erro no worker.")
         return 1

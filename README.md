@@ -5,8 +5,9 @@ manutenção e expurgo de dados. O projeto concentra a regra de negócio em
 workers independentes; o GitHub Actions será responsável apenas por preparar o
 ambiente e disparar cada worker.
 
-> Estado atual: fundação criada pela SCRUM-230. Os workers e os workflows serão
-> adicionados nas subtarefas seguintes.
+> Estado atual: fundação criada pela SCRUM-230 e worker de usuários órfãos
+> implementado pela SCRUM-231. Os demais workers e workflows serão adicionados
+> nas subtarefas seguintes.
 
 ## Princípios da arquitetura
 
@@ -28,10 +29,12 @@ astro-data-cleanup/
 │   ├── config/
 │   │   ├── logging_config.py
 │   │   └── settings.py
-│   ├── database/                  # Clientes de bancos, adicionados sob demanda
-│   ├── integrations/              # Integrações externas, como Firebase
+│   ├── database/
+│   │   └── postgres.py
+│   ├── integrations/
+│   │   └── firebase.py
 │   ├── workers/
-│   │   ├── firebase_orphan_users/ # SCRUM-231
+│   │   ├── firebase_orphan_users/ # Worker implementado na SCRUM-231
 │   │   ├── chatbot_sessions/      # SCRUM-232
 │   │   ├── old_conversations/     # SCRUM-233
 │   │   ├── base.py
@@ -49,8 +52,7 @@ Diretórios reservados que ainda não possuem implementação contêm um
 
 - Python 3.11 ou superior.
 
-O projeto não possui dependências de runtime nesta etapa. Para instalar as
-ferramentas de desenvolvimento:
+Para instalar o projeto e as ferramentas de desenvolvimento:
 
 ```bash
 python -m pip install -e ".[dev]"
@@ -70,11 +72,15 @@ Variáveis disponíveis na fundação:
 | `DRY_RUN` | `true` | Impede exclusões reais quando habilitado |
 | `LOG_LEVEL` | `INFO` | Nível global de logging |
 
-As variáveis de PostgreSQL, MongoDB, Qdrant e Firebase já estão documentadas no
-`.env.example`, mas somente serão consumidas pelos módulos que precisarem delas.
-O PostgreSQL será configurado por uma URL completa em `POSTGRES_URL`. Para o
-Firebase Admin SDK, o projeto usará `FIREBASE_PROJECT_ID` e o JSON da conta de
-serviço codificado em Base64 em `FIREBASE_CREDENTIALS_BASE64`.
+As variáveis de PostgreSQL, MongoDB, Qdrant e Firebase estão documentadas no
+`.env.example`. O PostgreSQL é configurado por uma URL completa em
+`POSTGRES_URL`. Para o Firebase Admin SDK, o projeto usa `FIREBASE_PROJECT_ID` e
+o JSON completo da conta de serviço codificado em Base64 em
+`FIREBASE_CREDENTIALS_BASE64`.
+
+O worker valida que o `project_id` dentro das credenciais corresponde a
+`FIREBASE_PROJECT_ID` antes de acessar o Authentication. Essa proteção evita
+executar o expurgo acidentalmente em outro projeto Firebase.
 
 ## Execução local
 
@@ -96,8 +102,7 @@ Executar todos os workers registrados:
 python -m src.main all
 ```
 
-Enquanto nenhum worker concreto estiver registrado, `all` termina com um aviso
-e `--list` informa que a lista está vazia.
+O worker disponível nesta etapa é `firebase-orphan-users`.
 
 ### DRY RUN
 
@@ -112,6 +117,35 @@ python -m src.main all
 Uma exclusão real só poderá ocorrer com `DRY_RUN=false` e com o worker concreto
 implementado. Cada worker é responsável por consultar e registrar os dados que
 seriam removidos antes de efetuar qualquer exclusão.
+
+## Worker de usuários órfãos no Firebase
+
+O worker `firebase-orphan-users`:
+
+1. lista os UIDs existentes em `conta.firebase_uid` no PostgreSQL;
+2. lista todas as contas do Firebase Authentication por páginas;
+3. identifica contas do Firebase ausentes no PostgreSQL;
+4. revalida cada UID no PostgreSQL imediatamente antes da possível exclusão;
+5. em `DRY_RUN`, apenas registra o que seria removido;
+6. fora de `DRY_RUN`, exclui cada conta individualmente e registra o resultado.
+
+A consulta à tabela `conta` inclui suas tabelas herdadas `usuario` e `admin`.
+Assim, uma conta administrativa existente também é preservada. Se uma consulta
+de validação falhar, o worker interrompe a execução em vez de assumir que a
+conta é órfã. Falhas individuais de exclusão são registradas e fazem o processo
+terminar com código diferente de zero.
+
+Execução segura inicial:
+
+```bash
+DRY_RUN=true python -m src.main firebase-orphan-users
+```
+
+Depois de revisar os logs, a exclusão real pode ser habilitada explicitamente:
+
+```bash
+DRY_RUN=false python -m src.main firebase-orphan-users
+```
 
 ## Testes
 
