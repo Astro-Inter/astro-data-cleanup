@@ -5,9 +5,9 @@ manutenção e expurgo de dados. O projeto concentra a regra de negócio em
 workers independentes; o GitHub Actions será responsável apenas por preparar o
 ambiente e disparar cada worker.
 
-> Estado atual: fundação criada pela SCRUM-230 e worker de usuários órfãos
-> implementado pela SCRUM-231. Os demais workers e workflows serão adicionados
-> nas subtarefas seguintes.
+> Estado atual: fundação criada pela SCRUM-230, worker de usuários órfãos
+> implementado pela SCRUM-231 e worker de sessões antigas implementado pela
+> SCRUM-232. Os itens restantes serão adicionados nas subtarefas seguintes.
 
 ## Princípios da arquitetura
 
@@ -30,12 +30,14 @@ astro-data-cleanup/
 │   │   ├── logging_config.py
 │   │   └── settings.py
 │   ├── database/
-│   │   └── postgres.py
+│   │   ├── mongodb.py
+│   │   ├── postgres.py
+│   │   └── qdrant.py
 │   ├── integrations/
 │   │   └── firebase.py
 │   ├── workers/
 │   │   ├── firebase_orphan_users/ # Worker implementado na SCRUM-231
-│   │   ├── chatbot_sessions/      # SCRUM-232
+│   │   ├── chatbot_sessions/      # Worker implementado na SCRUM-232
 │   │   ├── old_conversations/     # SCRUM-233
 │   │   ├── base.py
 │   │   └── registry.py
@@ -82,6 +84,11 @@ O worker valida que o `project_id` dentro das credenciais corresponde a
 `FIREBASE_PROJECT_ID` antes de acessar o Authentication. Essa proteção evita
 executar o expurgo acidentalmente em outro projeto Firebase.
 
+O MongoDB usa `MONGODB_URI`, `MONGODB_DATABASE` e a coleção configurável
+`MONGODB_SESSIONS_COLLECTION`, cujo padrão é `sessoes`. O `QDRANT_URL` deve ser
+a URL base da instância, sem o caminho `/dashboard`, e usa `QDRANT_API_KEY`. A
+coleção `QDRANT_SUMMARIES_COLLECTION` tem como padrão `memoria_resumos`.
+
 ## Execução local
 
 Listar workers registrados:
@@ -102,7 +109,8 @@ Executar todos os workers registrados:
 python -m src.main all
 ```
 
-O worker disponível nesta etapa é `firebase-orphan-users`.
+Os workers disponíveis nesta etapa são `firebase-orphan-users` e
+`chatbot-sessions`.
 
 ### DRY RUN
 
@@ -145,6 +153,33 @@ Depois de revisar os logs, a exclusão real pode ser habilitada explicitamente:
 
 ```bash
 DRY_RUN=false python -m src.main firebase-orphan-users
+```
+
+## Worker de sessões antigas do chatbot
+
+O worker `chatbot-sessions` considera expirada uma sessão de `sessoes` quando
+`iniciada_em` é anterior a um ano-calendário contado em UTC. O `_id` textual do
+documento identifica o payload `session_id` dos pontos na coleção
+`memoria_resumos`.
+
+Para cada sessão elegível, o worker:
+
+1. revalida no MongoDB se a sessão ainda está expirada;
+2. conta ou remove todos os pontos cujo payload `session_id` corresponde ao
+   `_id` da sessão;
+3. aguarda o Qdrant concluir a operação;
+4. remove o documento do MongoDB usando `_id`, `iniciada_em` original e data
+   limite como condições de segurança.
+
+O Qdrant é processado antes do MongoDB. Se o Qdrant falhar, o documento do
+MongoDB é preservado. Se o MongoDB falhar depois da remoção vetorial, a sessão
+continua disponível para uma nova execução, e a remoção por filtro no Qdrant é
+idempotente.
+
+Execução inicial em modo seguro:
+
+```bash
+DRY_RUN=true python -m src.main chatbot-sessions
 ```
 
 ## Testes

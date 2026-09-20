@@ -37,6 +37,12 @@ class Settings:
     postgres_url: str | None = None
     firebase_project_id: str | None = None
     firebase_credentials_base64: str | None = None
+    mongodb_uri: str | None = None
+    mongodb_database: str | None = None
+    mongodb_sessions_collection: str = "sessoes"
+    qdrant_url: str | None = None
+    qdrant_api_key: str | None = None
+    qdrant_summaries_collection: str = "memoria_resumos"
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -50,6 +56,17 @@ class Settings:
         firebase_credentials_base64 = (
             source.get("FIREBASE_CREDENTIALS_BASE64", "").strip() or None
         )
+        mongodb_uri = source.get("MONGODB_URI", "").strip() or None
+        mongodb_database = source.get("MONGODB_DATABASE", "").strip() or None
+        mongodb_sessions_collection = (
+            source.get("MONGODB_SESSIONS_COLLECTION", "sessoes").strip() or "sessoes"
+        )
+        qdrant_url = source.get("QDRANT_URL", "").strip() or None
+        qdrant_api_key = source.get("QDRANT_API_KEY", "").strip() or None
+        qdrant_summaries_collection = (
+            source.get("QDRANT_SUMMARIES_COLLECTION", "memoria_resumos").strip()
+            or "memoria_resumos"
+        )
 
         if log_level not in VALID_LOG_LEVELS:
             allowed = ", ".join(sorted(VALID_LOG_LEVELS))
@@ -62,6 +79,12 @@ class Settings:
             postgres_url=postgres_url,
             firebase_project_id=firebase_project_id,
             firebase_credentials_base64=firebase_credentials_base64,
+            mongodb_uri=mongodb_uri,
+            mongodb_database=mongodb_database,
+            mongodb_sessions_collection=mongodb_sessions_collection,
+            qdrant_url=qdrant_url,
+            qdrant_api_key=qdrant_api_key,
+            qdrant_summaries_collection=qdrant_summaries_collection,
         )
 
     @staticmethod

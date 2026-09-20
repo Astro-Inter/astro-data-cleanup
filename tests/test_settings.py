@@ -9,6 +9,8 @@ def test_settings_use_safe_defaults() -> None:
     assert settings.app_env == "development"
     assert settings.dry_run is True
     assert settings.log_level == "INFO"
+    assert settings.mongodb_sessions_collection == "sessoes"
+    assert settings.qdrant_summaries_collection == "memoria_resumos"
 
 
 @pytest.mark.parametrize("value", ["false", "0", "no", "off", "FALSE"])
@@ -43,3 +45,23 @@ def test_settings_load_worker_credentials() -> None:
 def test_settings_require_rejects_missing_worker_configuration() -> None:
     with pytest.raises(SettingsError, match="POSTGRES_URL"):
         Settings.require(None, "POSTGRES_URL")
+
+
+def test_settings_load_chatbot_storage_configuration() -> None:
+    settings = Settings.from_env(
+        {
+            "MONGODB_URI": "mongodb://example",
+            "MONGODB_DATABASE": "chatbot",
+            "MONGODB_SESSIONS_COLLECTION": "custom_sessions",
+            "QDRANT_URL": "https://qdrant.example:6333",
+            "QDRANT_API_KEY": "secret",
+            "QDRANT_SUMMARIES_COLLECTION": "custom_summaries",
+        }
+    )
+
+    assert settings.mongodb_uri == "mongodb://example"
+    assert settings.mongodb_database == "chatbot"
+    assert settings.mongodb_sessions_collection == "custom_sessions"
+    assert settings.qdrant_url == "https://qdrant.example:6333"
+    assert settings.qdrant_api_key == "secret"
+    assert settings.qdrant_summaries_collection == "custom_summaries"

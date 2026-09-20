@@ -13,6 +13,8 @@ authors = [{ name = "Astro" }]
 dependencies = [
     "firebase-admin>=7.5,<8",
     "psycopg[binary]>=3.3,<4",
+    "pymongo>=4.16,<5",
+    "qdrant-client>=1.18,<2",
 ]
 
 [project.optional-dependencies]
