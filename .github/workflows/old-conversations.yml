@@ -32,6 +32,8 @@ jobs:
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
       MONGODB_URI: ${{ secrets.MONGODB_URI }}
       MONGODB_DATABASE: ${{ secrets.MONGODB_DATABASE }}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GRAFANA_OTLP_ENDPOINT }}
+      OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.GRAFANA_OTLP_HEADERS }}
 
     steps:
       - name: Obter código-fonte

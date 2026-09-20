@@ -46,7 +46,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         LOGGER.error("Configuração inválida: %s", error)
         return 2
 
-    configure_logging(settings.log_level)
+    known_jobs = {*worker_registry.names(), "all"}
+    configure_logging(
+        settings.log_level,
+        environment=settings.app_env,
+        job_name=args.worker if args.worker in known_jobs and not args.list_workers else None,
+    )
 
     if args.list_workers:
         names = worker_registry.names()

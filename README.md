@@ -71,6 +71,8 @@ Variáveis disponíveis na fundação:
 | `APP_ENV` | `development` | Ambiente da aplicação |
 | `DRY_RUN` | `true` | Impede exclusões reais quando habilitado |
 | `LOG_LEVEL` | `INFO` | Nível global de logging |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | vazio | URL base OTLP/HTTP do Grafana Cloud |
+| `OTEL_EXPORTER_OTLP_HEADERS` | vazio | Header de autenticação OTLP |
 
 As variáveis de PostgreSQL, MongoDB, Qdrant e Firebase estão documentadas no
 `.env.example`. O PostgreSQL é configurado por uma URL completa em
@@ -225,11 +227,57 @@ Configure estes GitHub Actions Secrets antes de habilitar os workflows:
 | `MONGODB_DATABASE` | Sessões e conversas antigas |
 | `QDRANT_URL` | Sessões antigas |
 | `QDRANT_API_KEY` | Sessões antigas |
+| `GRAFANA_OTLP_ENDPOINT` | Todos os workers |
+| `GRAFANA_OTLP_HEADERS` | Todos os workers |
 
 Os workflows solicitam somente permissão de leitura do conteúdo do
 repositório, não persistem credenciais Git no checkout e bloqueiam execuções
 simultâneas do mesmo worker. Agendamentos do GitHub Actions passam a funcionar
 quando os arquivos estão na branch padrão do repositório.
+
+## Observabilidade
+
+O projeto usa OpenTelemetry para enviar logs ao Grafana Cloud pelo protocolo
+OTLP/HTTP. O console continua recebendo cada evento em JSON, com `timestamp`,
+`level`, `service.name`, `service.version`, ambiente e mensagem. Durante a
+execução também são incluídos, quando aplicáveis, `job.name`, `worker.name`,
+`duration` e `status`. O identificador do serviço é
+`service.name=astro-data-cleanup`.
+
+A exportação é opcional. Ela só é ativada quando as duas variáveis abaixo têm
+valor; sem elas, inclusive no desenvolvimento local, o projeto mantém apenas o
+logging no console:
+
+```text
+OTEL_EXPORTER_OTLP_ENDPOINT
+OTEL_EXPORTER_OTLP_HEADERS
+```
+
+Use em `OTEL_EXPORTER_OTLP_ENDPOINT` a URL base exibida no bloco OpenTelemetry
+da sua stack Grafana Cloud. Por ser a variável OTLP genérica, não acrescente
+`/v1/logs`: o exporter HTTP monta o caminho específico do sinal. O header tem
+o formato fornecido pelo Grafana, por exemplo
+`Authorization=Basic <credencial-codificada>`. Nunca grave esse valor em
+arquivos versionados.
+
+Nos GitHub Actions, crie secrets do repositório ou da organização com estes
+nomes:
+
+- `GRAFANA_OTLP_ENDPOINT`: URL base OTLP da stack;
+- `GRAFANA_OTLP_HEADERS`: header completo de autenticação.
+
+Os workflows convertem esses secrets nas variáveis `OTEL_EXPORTER_OTLP_*` para
+o processo Python. Agenda, execução manual e demais credenciais não são
+alteradas.
+
+Para testar localmente sem Grafana, deixe as duas variáveis vazias e execute
+`python -m src.main --list` ou um worker em `DRY_RUN=true`. Para validar o envio
+real, defina ambas no ambiente, execute um worker seguro e confirme em Grafana
+Cloud > Explore > Logs com uma consulta pelo label
+`{service_name="astro-data-cleanup"}`. Filtre também por `job_name` ou
+`deployment_environment_name` para isolar a execução. A chegada dos eventos
+`Worker iniciado` e `Worker finalizado` confirma o pipeline; em caso de falha
+de conexão, o processo preserva os logs JSON no console.
 
 ## Testes
 

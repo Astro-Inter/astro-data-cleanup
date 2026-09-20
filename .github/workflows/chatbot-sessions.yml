@@ -34,6 +34,8 @@ jobs:
       MONGODB_DATABASE: ${{ secrets.MONGODB_DATABASE }}
       QDRANT_URL: ${{ secrets.QDRANT_URL }}
       QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.GRAFANA_OTLP_ENDPOINT }}
+      OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.GRAFANA_OTLP_HEADERS }}
 
     steps:
       - name: Obter código-fonte
