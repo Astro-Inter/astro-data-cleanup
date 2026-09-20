@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "astro-data-cleanup"
+version = "0.1.0"
+description = "Serviço de rotinas automatizadas de manutenção e expurgo de dados do Astro"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Astro" }]
+dependencies = [
+    "firebase-admin>=7.5,<8",
+    "psycopg[binary]>=3.3,<4",
+    "pymongo>=4.16,<5",
+    "qdrant-client>=1.18,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<9",
+    "ruff>=0.11,<1",
+]
+
+[project.scripts]
+astro-data-cleanup = "src.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
