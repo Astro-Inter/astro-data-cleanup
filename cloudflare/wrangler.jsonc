@@ -37,7 +37,7 @@
   "vars": {
     "API_ENABLED": "true",
     "JOBS_ENABLED": "true",
-    "DRY_RUN": "true",
+    "DRY_RUN": "false",
     "FIREBASE_PROJECT_ID": "astro-ba278",
     "MONGODB_DATABASE": "astro",
     "MONGODB_SESSIONS_COLLECTION": "sessoes",

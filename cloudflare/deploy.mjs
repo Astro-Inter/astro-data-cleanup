@@ -14,7 +14,7 @@ const safe = config.account_id === "25eb8d3849be3adbff3678f4ec781804"
   && config.preview_urls === false
   && config.vars?.API_ENABLED === "true"
   && config.vars?.JOBS_ENABLED === "true"
-  && config.vars?.DRY_RUN === "true"
+  && config.vars?.DRY_RUN === "false"
   && JSON.stringify(config.triggers?.crons) === JSON.stringify(["5,25,45 * * * *"])
   && (config.containers?.length ?? 0) === 0
   && config.durable_objects?.bindings?.length === 1
@@ -22,7 +22,7 @@ const safe = config.account_id === "25eb8d3849be3adbff3678f4ec781804"
   && validId(hyperdrive.get("POSTGRES"));
 
 if (!safe) {
-  console.error("Deploy blocked: require Workers Free defaults, SQLite Durable Object only, hourly crons, DRY_RUN=true, and a valid Hyperdrive binding.");
+  console.error("Deploy blocked: require Workers Free defaults, SQLite Durable Object only, hourly crons, DRY_RUN=false, and a valid Hyperdrive binding.");
   process.exit(1);
 }
 

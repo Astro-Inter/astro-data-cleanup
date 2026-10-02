@@ -15,12 +15,13 @@ A configuração usa `5,25,45 * * * *` como um único Cron Trigger da conta. O W
 identifica cada rotina pelo minuto agendado, preservando a cadência anterior e
 liberando dois dos cinco slots gratuitos da conta.
 
-O Worker está configurado com `JOBS_ENABLED=true` e `DRY_RUN=true`. Nesse modo,
-ele só consulta e conta candidatos; não apaga usuários, documentos ou vetores.
-Os três workflows do GitHub estão desativados; a exclusão real aguarda aprovação.
-O endpoint manual também exige `JOBS_TOKEN` e assume simulação quando
-`dry_run` não é informado. A API também recusa `dry_run=false` enquanto o
-Worker estiver configurado em simulação.
+O Worker está configurado com `JOBS_ENABLED=true` e `DRY_RUN=false`; portanto,
+os três crons executam as exclusões previstas: usuários órfãos do Firebase,
+sessões com mais de um ano (incluindo vetores no Qdrant) e conversas com mais
+de dois anos. Os três workflows do GitHub estão desativados. O endpoint manual
+exige `JOBS_TOKEN` e continua assumindo simulação quando `dry_run` não é
+informado; para uma execução manual real, é necessário enviar explicitamente
+`dry_run=false`.
 
 Endpoints publicados:
 
@@ -48,9 +49,9 @@ npm run deploy
 ```
 
 O `--dry-run` valida o bundle sem publicar. O deploy normal publica os valores
-de `wrangler.jsonc`, que atualmente mantêm `DRY_RUN=true`. Os workflows de
-limpeza já estão desativados no GitHub. O endpoint `/health` é público e não
-revela configuração.
+de `wrangler.jsonc`, que mantêm `DRY_RUN=false`. Os workflows de limpeza já
+estão desativados no GitHub. O endpoint `/health` é público e não revela
+configuração.
 
 ## Limites operacionais
 
