@@ -1,0 +1,7 @@
+node_modules/
+.wrangler/
+.dev.vars
+.api-token
+secrets*.json
+validation*.json
+__pycache__/
