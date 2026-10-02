@@ -2,14 +2,18 @@
 
 Implementação nativa do Worker para os três jobs de limpeza, sem Containers. Os
 jobs rodam no Durable Object com armazenamento SQLite e se conectam ao PostgreSQL
-por Hyperdrive, ao MongoDB por TCP e ao Qdrant pela API HTTPS. Os horários são
-em UTC, escalonados a cada hora:
+por Hyperdrive, ao MongoDB por TCP e ao Qdrant pela API HTTPS. Uma única expressão
+Cron preserva os três horários UTC de cada hora:
 
 | Job | Cron UTC | Operação |
 | --- | --- | --- |
 | `firebase-orphan-users` | minuto 05 | Detecta usuários do Firebase sem conta correspondente no PostgreSQL |
 | `chatbot-sessions` | minuto 25 | Localiza sessões com mais de um ano e conta os vetores relacionados |
 | `old-conversations` | minuto 45 | Localiza mensagens com mais de dois anos |
+
+A configuração usa `5,25,45 * * * *` como um único Cron Trigger da conta. O Worker
+identifica cada rotina pelo minuto agendado, preservando a cadência anterior e
+liberando dois dos cinco slots gratuitos da conta.
 
 O Worker está configurado com `JOBS_ENABLED=true` e `DRY_RUN=true`. Nesse modo,
 ele só consulta e conta candidatos; não apaga usuários, documentos ou vetores.

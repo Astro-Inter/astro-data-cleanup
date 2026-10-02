@@ -1,12 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { createCleanupPorts, type CleanupEnv } from "./connectors.ts";
 import { runCleanup, type CleanupJob } from "./cleanup.ts";
-
-const CRON_TO_JOB: Record<string, CleanupJob> = {
-  "5 * * * *": "firebase-orphan-users",
-  "25 * * * *": "chatbot-sessions",
-  "45 * * * *": "old-conversations",
-};
+import { cleanupJobForSchedule, cleanupSchedules } from "./schedule.ts";
 
 type RunState = {
   job: CleanupJob;
@@ -125,20 +120,20 @@ export default {
 
     if (url.pathname === "/status" && request.method === "GET") {
       const latest = await Promise.all(
-        Object.values(CRON_TO_JOB).map((job) => coordinator(env, job).getLatest()),
+        Object.values(cleanupSchedules()).map((job) => coordinator(env, job).getLatest()),
       );
       return json({
         service: "astro-data-cleanup",
         enabled: env.JOBS_ENABLED === "true",
         dry_run: env.DRY_RUN !== "false",
-        schedules: CRON_TO_JOB,
-        latest: Object.fromEntries(Object.values(CRON_TO_JOB).map((job, index) => [job, latest[index]])),
+        schedules: cleanupSchedules(),
+        latest: Object.fromEntries(Object.values(cleanupSchedules()).map((job, index) => [job, latest[index]])),
       });
     }
 
     const match = url.pathname.match(/^\/jobs\/([a-z-]+)$/u);
     const job = match?.[1] as CleanupJob | undefined;
-    if (request.method !== "POST" || !job || !Object.values(CRON_TO_JOB).includes(job)) {
+    if (request.method !== "POST" || !job || !Object.values(cleanupSchedules()).includes(job)) {
       return json({ error: "not_found" }, 404);
     }
     const dryRun = parseDryRun(url);
@@ -151,8 +146,7 @@ export default {
   },
 
   async scheduled(event: ScheduledController, env: Env): Promise<void> {
-    const job = CRON_TO_JOB[event.cron];
-    if (!job) throw new Error("unexpected_cron_trigger");
+    const job = cleanupJobForSchedule(event.cron, event.scheduledTime);
     if (env.JOBS_ENABLED !== "true") {
       console.log(JSON.stringify({ event: "cleanup_cron_inactive", job }));
       return;

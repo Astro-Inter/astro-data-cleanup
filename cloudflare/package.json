@@ -6,7 +6,7 @@
     "check": "node ./node_modules/typescript/bin/tsc --noEmit",
     "deploy": "node deploy.mjs",
     "dev": "wrangler dev",
-    "test": "node --experimental-strip-types --test cleanup.test.ts"
+    "test": "node --experimental-strip-types --test cleanup.test.ts schedule.test.ts"
   },
   "dependencies": {
     "mongodb": "7.7.0",
