@@ -65,3 +65,10 @@ saída do Cloudflare Workers. Não amplie a lista de IPs permitidos para
 `0.0.0.0/0`; se o Atlas negar acesso, a validação deve parar e a rede deve ser
 configurada de forma apropriada. Execuções com falhas ou timeout devem ser
 inspecionadas antes de qualquer repetição.
+
+## Exportação Grafana
+
+Os resultados dos jobs são enviados em OTLP/HTTP para GRAFANA_OTLP_ENDPOINT;
+GRAFANA_OTLP_HEADERS fica como Secret do Worker. O payload contém somente o
+nome do evento, estado e contadores de execução, sem dados dos registros.
+Falhas de telemetria não interrompem a limpeza.

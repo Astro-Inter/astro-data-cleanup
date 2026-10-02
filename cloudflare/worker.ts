@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { createCleanupPorts, type CleanupEnv } from "./connectors.ts";
 import { runCleanup, type CleanupJob } from "./cleanup.ts";
 import { cleanupJobForSchedule, cleanupSchedules } from "./schedule.ts";
+import { queueGrafanaLog, type GrafanaEnv } from "./grafana-logs.ts";
 
 type RunState = {
   job: CleanupJob;
@@ -19,7 +20,7 @@ type RunState = {
   error_type?: string;
 };
 
-interface Env extends CleanupEnv {
+interface Env extends CleanupEnv, GrafanaEnv {
   COORDINATOR: DurableObjectNamespace<CleanupCoordinator>;
   API_ENABLED?: string;
   JOBS_ENABLED?: string;
@@ -110,7 +111,7 @@ export class CleanupCoordinator extends DurableObject<Env> {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/health" && request.method === "GET") {
       return json({ service: "astro-data-cleanup", status: "ok" });
@@ -142,10 +143,15 @@ export default {
       return json({ error: "destructive_run_disabled" }, 503);
     }
     const result = await coordinator(env, job).runJob(job, dryRun);
+    queueGrafanaLog(ctx, env, "astro-data-cleanup", "cleanup_job_finished",
+      result.status === "success" ? "INFO" : "ERROR", {
+        job, status: result.status, dry_run: result.dry_run, analyzed: result.analyzed,
+        candidates: result.candidates, removed: result.removed, errors: result.errors,
+      });
     return json(result, result.status === "success" ? 200 : 500);
   },
 
-  async scheduled(event: ScheduledController, env: Env): Promise<void> {
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     const job = cleanupJobForSchedule(event.cron, event.scheduledTime);
     if (env.JOBS_ENABLED !== "true") {
       console.log(JSON.stringify({ event: "cleanup_cron_inactive", job }));
@@ -153,6 +159,11 @@ export default {
     }
     const dryRun = env.DRY_RUN !== "false";
     const result = await coordinator(env, job).runJob(job, dryRun);
+    queueGrafanaLog(ctx, env, "astro-data-cleanup", "cleanup_job_finished",
+      result.status === "success" ? "INFO" : "ERROR", {
+        job, status: result.status, dry_run: result.dry_run, analyzed: result.analyzed,
+        candidates: result.candidates, removed: result.removed, errors: result.errors,
+      });
     console.log(JSON.stringify({ event: "cleanup_job_finished", ...result }));
   },
 } satisfies ExportedHandler<Env>;
