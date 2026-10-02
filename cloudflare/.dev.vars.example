@@ -1,0 +1,5 @@
+# Copy to .dev.vars for local-only secret bindings; never commit .dev.vars.
+FIREBASE_CREDENTIALS_BASE64=
+JOBS_TOKEN=
+MONGODB_URI=
+QDRANT_API_KEY=

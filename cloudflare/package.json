@@ -1,0 +1,22 @@
+{
+  "name": "astro-data-cleanup-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "deploy": "node deploy.mjs",
+    "dev": "wrangler dev",
+    "test": "node --experimental-strip-types --test cleanup.test.ts schedule.test.ts grafana-logs.test.ts"
+  },
+  "dependencies": {
+    "mongodb": "7.7.0",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261001.1",
+    "@types/node": "22.20.3",
+    "@types/pg": "8.15.5",
+    "typescript": "5.9.3",
+    "wrangler": "4.145.0"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "astro-data-cleanup",
+  "account_id": "25eb8d3849be3adbff3678f4ec781804",
+  "main": "worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {
+    "enabled": false
+  },
+  "hyperdrive": [
+    {
+      "binding": "POSTGRES",
+      "id": "2004ed1dbe4a460495e663c42f3b801f"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "COORDINATOR",
+        "class_name": "CleanupCoordinator"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "CleanupCoordinator"
+      ]
+    }
+  ],
+  "vars": {
+    "API_ENABLED": "true",
+    "JOBS_ENABLED": "true",
+    "DRY_RUN": "false",
+    "GRAFANA_OTLP_ENDPOINT": "https://otlp-gateway-prod-sa-east-1.grafana.net/otlp",
+    "FIREBASE_PROJECT_ID": "astro-ba278",
+    "MONGODB_DATABASE": "astro",
+    "MONGODB_SESSIONS_COLLECTION": "sessoes",
+    "MONGODB_MESSAGES_COLLECTION": "mensagens",
+    "QDRANT_URL": "https://67a0d0d6-5749-420e-bac6-769634664002.sa-east-1-0.aws.cloud.qdrant.io",
+    "QDRANT_SUMMARIES_COLLECTION": "memoria_resumos"
+  },
+  "triggers": {
+    "crons": [
+      "5,25,45 * * * *"
+    ]
+  }
+}
