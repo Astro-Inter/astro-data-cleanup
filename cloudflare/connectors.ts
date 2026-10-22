@@ -1,6 +1,6 @@
-import { MongoClient, type Collection, type Document, type Filter, type FindCursor, type WithId } from "mongodb";
+import { MongoClient, ObjectId, type Collection, type Document, type Filter, type FindCursor, type WithId } from "mongodb";
 import { Pool } from "pg";
-import type { CleanupPorts, ExpiredMessage, ExpiredSession } from "./cleanup.ts";
+import type { CleanupPorts, ExpiredMessage, ExpiredSession, MessageId } from "./cleanup.ts";
 import { FirebaseAuthClient } from "./firebase-auth.ts";
 
 export interface HyperdriveBinding { connectionString: string }
@@ -78,7 +78,7 @@ export async function createCleanupPorts(env: CleanupEnv): Promise<{
   const getSessions = () => getMongo().db(required(env.MONGODB_DATABASE, "MONGODB_DATABASE"))
     .collection<{ _id: string; iniciada_em?: Date }>(env.MONGODB_SESSIONS_COLLECTION || "sessoes");
   const getMessages = () => getMongo().db(required(env.MONGODB_DATABASE, "MONGODB_DATABASE"))
-    .collection<{ _id: string; data?: Date }>(env.MONGODB_MESSAGES_COLLECTION || "mensagens");
+    .collection<{ _id: MessageId; data?: Date }>(env.MONGODB_MESSAGES_COLLECTION || "mensagens");
   const collectionName = encodeURIComponent(env.QDRANT_SUMMARIES_COLLECTION || "memoria_resumos");
 
   const ports: CleanupPorts = {
@@ -147,11 +147,11 @@ export async function createCleanupPorts(env: CleanupEnv): Promise<{
     },
     messages: {
       async *listExpired(cutoff: Date): AsyncIterable<ExpiredMessage> {
-        const cursor = mongoDocuments<{ _id: string; data?: Date }>(
+        const cursor = mongoDocuments<{ _id: MessageId; data?: Date }>(
           getMessages(), expiredFilter("data", cutoff), { _id: 1, data: 1 },
         );
         for await (const doc of cursor) {
-          if (typeof doc._id !== "string" || !(doc.data instanceof Date)) throw new Error("invalid_mongo_message");
+          if (((typeof doc._id !== "string" || !doc._id) && !(doc._id instanceof ObjectId)) || !(doc.data instanceof Date)) throw new Error("invalid_mongo_message");
           yield { id: doc._id, sentAt: doc.data };
         }
       },
