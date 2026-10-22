@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
+from bson import ObjectId
 
 from src.database.mongodb import (
     MongoChatSessionRepository,
@@ -87,11 +88,12 @@ def test_repository_rejects_non_textual_session_id() -> None:
         list(repository.list_expired(datetime(2025, 1, 10, tzinfo=timezone.utc)))
 
 
-def test_conversation_repository_lists_revalidates_and_deletes_expired_message() -> None:
+@pytest.mark.parametrize("message_id", ["message-1", ObjectId("507f1f77bcf86cd799439011")])
+def test_conversation_repository_lists_revalidates_and_deletes_expired_message(message_id) -> None:
     sent_at = datetime(2023, 9, 19, tzinfo=timezone.utc)
     cutoff = datetime(2024, 9, 19, tzinfo=timezone.utc)
     client = FakeMongoClient()
-    collection = FakeCollection({"_id": "message-1", "data": sent_at})
+    collection = FakeCollection({"_id": message_id, "data": sent_at})
     repository = MongoConversationRepository(
         "unused",
         "unused",
@@ -101,13 +103,15 @@ def test_conversation_repository_lists_revalidates_and_deletes_expired_message()
 
     messages = list(repository.list_expired(cutoff))
 
-    assert messages[0].message_id == "message-1"
+    assert messages[0].message_id == message_id
     assert messages[0].sent_at == sent_at
-    assert repository.is_expired("message-1", cutoff) is True
+    assert repository.is_expired(message_id, cutoff) is True
     assert repository.delete_expired(messages[0], cutoff) is True
+    assert collection.find_one_calls[0][0]["_id"] == message_id
+    assert type(collection.delete_calls[0]["_id"]) is type(message_id)
     assert collection.find_calls[0][0] == {"data": {"$type": "date", "$lt": cutoff}}
     assert collection.delete_calls[0] == {
-        "_id": "message-1",
+        "_id": message_id,
         "data": {"$eq": sent_at, "$type": "date", "$lt": cutoff},
     }
 
