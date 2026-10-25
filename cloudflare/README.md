@@ -33,15 +33,17 @@ Endpoints publicados:
 
 ## Configuração
 
-`wrangler.jsonc` desativa observabilidade e não configura Containers. O
+`wrangler.jsonc` envia logs somente ao destino Grafana existente, sem persistência
+local ou invocation logs, e não configura Containers. O
 PostgreSQL usa o Hyperdrive `astro-email-db` já existente. MongoDB, Firebase,
 Qdrant e o token da API usam Secrets do Worker. As variáveis públicas
 `FIREBASE_PROJECT_ID`, `MONGODB_DATABASE` e `QDRANT_URL` são configuração, não
 credenciais. Não inclua valores do `.env` no Git.
 
 Instale e valide com `npm ci`, `npm run check` e `npm test`. O deploy protegido
-recusa uma conta diferente, cron diferente, modo de exclusão, Containers,
-observabilidade ativa ou ausência de Hyperdrive:
+recusa uma conta diferente, cron diferente, Containers, destino de logs diferente
+do Grafana, persistência local ou ausência de Hyperdrive. Mantém o modo de
+execução já configurado:
 
 ```powershell
 npm run deploy -- --dry-run
