@@ -1,8 +1,11 @@
+import type { ObjectId } from "mongodb";
+
 export type CleanupJob = "firebase-orphan-users" | "chatbot-sessions" | "old-conversations";
 
 export type FirebaseUser = { uid: string };
 export type ExpiredSession = { id: string; startedAt: Date };
-export type ExpiredMessage = { id: string; sentAt: Date };
+export type MessageId = string | ObjectId;
+export type ExpiredMessage = { id: MessageId; sentAt: Date };
 
 export interface CleanupPorts {
   accounts: {
@@ -20,7 +23,7 @@ export interface CleanupPorts {
   };
   messages: {
     listExpired(cutoff: Date): AsyncIterable<ExpiredMessage>;
-    isExpired(id: string, cutoff: Date): Promise<boolean>;
+    isExpired(id: MessageId, cutoff: Date): Promise<boolean>;
     deleteExpired(message: ExpiredMessage, cutoff: Date): Promise<boolean>;
   };
   vectors: {

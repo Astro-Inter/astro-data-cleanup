@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { calendarYearsBefore, runCleanup, type CleanupPorts } from "./cleanup.ts";
+import { calendarYearsBefore, runCleanup, type CleanupPorts, type ExpiredMessage } from "./cleanup.ts";
 
 function ports(overrides: Partial<CleanupPorts> = {}): CleanupPorts {
   return {
@@ -103,7 +103,7 @@ test("single item deletion errors are counted without aborting the whole cleanup
         yield { id: "two", sentAt: new Date(cutoff.getTime() - 1) };
       },
       async isExpired() { return true; },
-      async deleteExpired(message: { id: string }) { if (message.id === "one") throw new Error("db"); return true; },
+      async deleteExpired(message: ExpiredMessage) { if (message.id === "one") throw new Error("db"); return true; },
     },
   };
   const summary = await runCleanup("old-conversations", fake, false);

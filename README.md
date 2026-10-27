@@ -310,3 +310,7 @@ mocks nos testes.
 | SCRUM-232 | Worker de sessões antigas no MongoDB e Qdrant |
 | SCRUM-233 | Worker de conversas antigas |
 | SCRUM-234 | Workflows agendados e execução manual no GitHub Actions |
+
+As mensagens aceitam `_id` textual ou BSON `ObjectId`. O expurgo preserva o
+tipo original nas consultas de revalidação e exclusão, sem converter IDs em
+texto. A retenção de dois anos e a conferência da data original permanecem.

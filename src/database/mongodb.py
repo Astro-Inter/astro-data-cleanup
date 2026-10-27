@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Protocol
 
+from bson import ObjectId
+
 
 class MongoSessionDataError(ValueError):
     """Indica um documento de sessão incompatível com o contrato esperado."""
@@ -28,7 +30,7 @@ class ChatSession:
 class ConversationMessage:
     """Identifica uma mensagem e a data usada para sua retenção."""
 
-    message_id: str
+    message_id: str | ObjectId
     sent_at: datetime
 
 
@@ -49,7 +51,7 @@ class ConversationRepository(Protocol):
 
     def list_expired(self, cutoff: datetime) -> Iterable[ConversationMessage]: ...
 
-    def is_expired(self, message_id: str, cutoff: datetime) -> bool: ...
+    def is_expired(self, message_id: str | ObjectId, cutoff: datetime) -> bool: ...
 
     def delete_expired(self, message: ConversationMessage, cutoff: datetime) -> bool: ...
 
@@ -191,7 +193,7 @@ class MongoConversationRepository:
         for document in self._collection.find(query, projection):
             yield self._to_message(document)
 
-    def is_expired(self, message_id: str, cutoff: datetime) -> bool:
+    def is_expired(self, message_id: str | ObjectId, cutoff: datetime) -> bool:
         """Revalida a mensagem imediatamente antes do expurgo."""
         query = {"_id": message_id, **self._expiration_filter(cutoff)}
         return self._collection.find_one(query, {"_id": 1}) is not None
@@ -222,8 +224,8 @@ class MongoConversationRepository:
         message_id = document.get("_id")
         sent_at = document.get("data")
 
-        if not isinstance(message_id, str) or not message_id:
-            raise MongoMessageDataError("A mensagem deve possuir um _id textual não vazio.")
+        if not isinstance(message_id, (str, ObjectId)) or not message_id:
+            raise MongoMessageDataError("A mensagem deve possuir um _id textual não vazio ou ObjectId.")
         if not isinstance(sent_at, datetime):
             raise MongoMessageDataError(
                 f"A mensagem {message_id} deve possuir data como BSON Date."
