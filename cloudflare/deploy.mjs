@@ -10,7 +10,13 @@ const validId = (id) => typeof id === "string" && /^[a-f0-9]{32}$/iu.test(id) &&
 const args = process.argv.slice(2);
 const safe = config.account_id === "25eb8d3849be3adbff3678f4ec781804"
   && !Object.hasOwn(config, "limits")
-  && config.observability?.enabled === false
+  && config.observability?.enabled === true
+  && config.observability.logs?.enabled === true
+  && config.observability.logs?.invocation_logs === false
+  && config.observability.logs?.persist === false
+  && config.observability.logs?.head_sampling_rate === 1
+  && JSON.stringify(config.observability.logs?.destinations) === JSON.stringify(['astro-grafana-logs'])
+  && !config.observability.traces
   && config.preview_urls === false
   && config.vars?.API_ENABLED === "true"
   && config.vars?.JOBS_ENABLED === "true"
@@ -22,7 +28,7 @@ const safe = config.account_id === "25eb8d3849be3adbff3678f4ec781804"
   && validId(hyperdrive.get("POSTGRES"));
 
 if (!safe) {
-  console.error("Deploy blocked: require Workers Free defaults, SQLite Durable Object only, hourly crons, DRY_RUN=false, and a valid Hyperdrive binding.");
+  console.error("Deploy blocked: require Workers Free defaults, Grafana-only logs without persistence, SQLite Durable Object only, hourly crons, DRY_RUN=false, and a valid Hyperdrive binding.");
   process.exit(1);
 }
 

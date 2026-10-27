@@ -1,3 +1,4 @@
+import { diagnostic } from "./diagnostics.ts";
 import { DurableObject } from "cloudflare:workers";
 import { createCleanupPorts, type CleanupEnv } from "./connectors.ts";
 import { runCleanup, type CleanupJob } from "./cleanup.ts";
@@ -18,6 +19,7 @@ type RunState = {
   cutoff?: string | null;
   error_code?: string;
   error_type?: string;
+  run_id?: string;
 };
 
 interface Env extends CleanupEnv, GrafanaEnv {
@@ -61,6 +63,7 @@ function coordinator(env: Env, job: CleanupJob): DurableObjectStub<CleanupCoordi
 export class CleanupCoordinator extends DurableObject<Env> {
   async runJob(job: CleanupJob, dryRun: boolean): Promise<RunState> {
     const startedAt = new Date().toISOString();
+    const runId = crypto.randomUUID();
     const lock = await this.ctx.storage.transaction(async (txn) => {
       const runningSince = await txn.get<string>("running");
       if (runningSince && Date.now() - Date.parse(runningSince) < 20 * 60_000) return false;
@@ -69,7 +72,7 @@ export class CleanupCoordinator extends DurableObject<Env> {
     });
     if (!lock) {
       return {
-        job, status: "failed", dry_run: dryRun,
+        job, status: "failed", dry_run: dryRun, run_id: runId,
         started_at: startedAt, finished_at: new Date().toISOString(),
         errors: 1,
       };
@@ -79,10 +82,10 @@ export class CleanupCoordinator extends DurableObject<Env> {
       if (!dryRun && this.env.DRY_RUN !== "false") throw new Error("dry_run_protected");
       const created = await createCleanupPorts(this.env);
       let summary;
-      try { summary = await runCleanup(job, created.ports, dryRun); }
+      try { summary = await runCleanup(job, created.ports, dryRun, new Date(), runId); }
       finally { await created.close(); }
       const result: RunState = {
-        ...summary,
+        ...summary, run_id: runId,
         status: summary.errors ? "failed" : "success",
         started_at: startedAt,
         finished_at: new Date().toISOString(),
@@ -92,13 +95,14 @@ export class CleanupCoordinator extends DurableObject<Env> {
     } catch (error) {
       const errorCode = safeErrorCode(error);
       const result: RunState = {
-        job, status: "failed", dry_run: dryRun,
+        job, status: "failed", dry_run: dryRun, run_id: runId,
         started_at: startedAt, finished_at: new Date().toISOString(), errors: 1,
         error_code: errorCode,
         error_type: error instanceof Error ? error.name : typeof error,
       };
       await this.ctx.storage.put("latest", result);
-      console.error(JSON.stringify({ event: "cleanup_failed", job, dry_run: dryRun, error_code: errorCode }));
+      console.error(JSON.stringify({ event: "cleanup_failed", job, run_id: runId, dry_run: dryRun, error_code: errorCode, ...diagnostic(error) }));
+      queueGrafanaLog(this.ctx, this.env, "astro-data-cleanup", "cleanup_failed", "ERROR", { job, run_id: runId, ...diagnostic(error) });
       return result;
     } finally {
       await this.ctx.storage.delete("running");
@@ -145,8 +149,8 @@ export default {
     const result = await coordinator(env, job).runJob(job, dryRun);
     queueGrafanaLog(ctx, env, "astro-data-cleanup", "cleanup_job_finished",
       result.status === "success" ? "INFO" : "ERROR", {
-        job, status: result.status, dry_run: result.dry_run, analyzed: result.analyzed,
-        candidates: result.candidates, removed: result.removed, errors: result.errors,
+        job, run_id: result.run_id, status: result.status, dry_run: result.dry_run, analyzed: result.analyzed,
+        candidates: result.candidates, removed: result.removed, errors: result.errors, error_code: result.error_code, error_type: result.error_type,
       });
     return json(result, result.status === "success" ? 200 : 500);
   },
@@ -161,8 +165,8 @@ export default {
     const result = await coordinator(env, job).runJob(job, dryRun);
     queueGrafanaLog(ctx, env, "astro-data-cleanup", "cleanup_job_finished",
       result.status === "success" ? "INFO" : "ERROR", {
-        job, status: result.status, dry_run: result.dry_run, analyzed: result.analyzed,
-        candidates: result.candidates, removed: result.removed, errors: result.errors,
+        job, run_id: result.run_id, status: result.status, dry_run: result.dry_run, analyzed: result.analyzed,
+        candidates: result.candidates, removed: result.removed, errors: result.errors, error_code: result.error_code, error_type: result.error_type,
       });
     console.log(JSON.stringify({ event: "cleanup_job_finished", ...result }));
   },

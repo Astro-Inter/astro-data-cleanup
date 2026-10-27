@@ -1,3 +1,4 @@
+import { observe, diagnostic } from "./diagnostics.ts";
 import type { ObjectId } from "mongodb";
 
 export type CleanupJob = "firebase-orphan-users" | "chatbot-sessions" | "old-conversations";
@@ -64,6 +65,7 @@ export async function runCleanup(
   ports: CleanupPorts,
   dryRun: boolean,
   now: Date = new Date(),
+  runId?: string,
 ): Promise<CleanupSummary> {
   const summary: CleanupSummary = {
     job, dry_run: dryRun, analyzed: 0, candidates: 0, removed: 0,
@@ -79,9 +81,10 @@ export async function runCleanup(
       summary.candidates++;
       if (dryRun) continue;
       try {
-        await ports.firebase.deleteUser(user.uid);
+        await observe("delete_user", "firebase", () => ports.firebase.deleteUser(user.uid));
         summary.removed++;
-      } catch {
+      } catch (error) {
+        console.error(JSON.stringify({ event: "cleanup_item_failed", job, run_id: runId, ...diagnostic(error) }));
         summary.errors++;
       }
     }
@@ -97,16 +100,17 @@ export async function runCleanup(
       if (!(await ports.sessions.isExpired(session.id, cutoff))) continue;
       summary.candidates++;
       if (dryRun) {
-        try { summary.related_removed += await ports.vectors.countBySessionId(session.id); }
-        catch { summary.errors++; }
+        try { summary.related_removed += await observe("count_vectors", "qdrant", () => ports.vectors.countBySessionId(session.id)); }
+        catch (error) { console.error(JSON.stringify({ event: "cleanup_vector_count_failed", job, run_id: runId, ...diagnostic(error) })); summary.errors++; }
         continue;
       }
       try {
-        const vectorCount = await ports.vectors.deleteBySessionId(session.id);
+        const vectorCount = await observe("delete_vectors", "qdrant", () => ports.vectors.deleteBySessionId(session.id));
         summary.related_removed += vectorCount;
-        if (await ports.sessions.deleteExpired(session, cutoff)) summary.removed++;
+        if (await observe("delete_session", "mongodb", () => ports.sessions.deleteExpired(session, cutoff))) summary.removed++;
         else summary.errors++;
-      } catch {
+      } catch (error) {
+        console.error(JSON.stringify({ event: "cleanup_item_failed", job, run_id: runId, ...diagnostic(error) }));
         summary.errors++;
       }
     }
@@ -119,9 +123,10 @@ export async function runCleanup(
     summary.candidates++;
     if (dryRun) continue;
     try {
-      if (await ports.messages.deleteExpired(message, cutoff)) summary.removed++;
+      if (await observe("delete_message", "mongodb", () => ports.messages.deleteExpired(message, cutoff))) summary.removed++;
       else summary.errors++;
-    } catch {
+    } catch (error) {
+      console.error(JSON.stringify({ event: "cleanup_item_failed", job, run_id: runId, ...diagnostic(error) }));
       summary.errors++;
     }
   }
