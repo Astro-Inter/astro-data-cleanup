@@ -314,3 +314,7 @@ mocks nos testes.
 As mensagens aceitam `_id` textual ou BSON `ObjectId`. O expurgo preserva o
 tipo original nas consultas de revalidação e exclusão, sem converter IDs em
 texto. A retenção de dois anos e a conferência da data original permanecem.
+
+## Diagnóstico operacional
+
+Consulte [os campos e limites dos novos diagnósticos](docs/observability-diagnostics.md) para investigar falhas por requisição ou execução no Grafana.
